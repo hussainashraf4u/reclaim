@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="260" viewBox="0 0 900 260" role="img" aria-label="reclaim: find and safely clean reclaimable dev-machine data">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/><stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#34d399"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="260" rx="18" fill="url(#bg)"/>
+  <g transform="translate(70 62)">
+    <rect width="136" height="136" rx="30" fill="#0b1220" stroke="#334155" stroke-width="2"/>
+    <rect x="26" y="88" width="84" height="12" rx="6" fill="#334155"/>
+    <rect x="26" y="88" width="30" height="12" rx="6" fill="url(#bar)"/>
+    <rect x="26" y="62" width="84" height="12" rx="6" fill="#334155"/>
+    <rect x="26" y="62" width="56" height="12" rx="6" fill="url(#bar)" opacity=".8"/>
+    <rect x="26" y="36" width="84" height="12" rx="6" fill="#334155"/>
+    <rect x="26" y="36" width="76" height="12" rx="6" fill="url(#bar)" opacity=".6"/>
+  </g>
+  <text x="250" y="118" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="64" font-weight="700" fill="#f8fafc">reclaim<tspan fill="#34d399">_</tspan></text>
+  <text x="252" y="160" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="22" fill="#cbd5e1">Find and safely clean reclaimable dev-machine data.</text>
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="15">
+    <rect x="252" y="184" width="64" height="26" rx="13" fill="#14532d"/><text x="284" y="202" text-anchor="middle" fill="#86efac">safe</text>
+    <rect x="326" y="184" width="118" height="26" rx="13" fill="#78350f"/><text x="385" y="202" text-anchor="middle" fill="#fcd34d">regenerable</text>
+    <rect x="454" y="184" width="64" height="26" rx="13" fill="#7f1d1d"/><text x="486" y="202" text-anchor="middle" fill="#fca5a5">data</text>
+  </g>
+</svg>

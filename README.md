@@ -1,20 +1,66 @@
-# reclaim
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="reclaim: find and safely clean reclaimable dev-machine data" width="100%">
+</p>
 
-**Find and safely clean reclaimable dev-machine data on macOS and Linux.**
+<p align="center">
+  <a href="https://github.com/hussainashraf4u/reclaim/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/hussainashraf4u/reclaim/ci.yml?branch=main&label=CI&logo=github"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green"></a>
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white">
+  <img alt="Platforms: macOS and Linux" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey">
+  <img alt="Version 0.2.0" src="https://img.shields.io/badge/version-0.2.0-blue">
+  <a href="https://textual.textualize.io/"><img alt="Built with Textual" src="https://img.shields.io/badge/built%20with-Textual-8A2BE2"></a>
+</p>
 
-`reclaim` is an interactive terminal app (TUI) that scans your Mac for the things developers accumulate and forget about: package-manager caches, build output, Xcode and Android leftovers, Docker junk, old Node and Flutter versions, simulators, local LLM models. It ranks them by size, explains each one, and cleans only the items you pick.
+<p align="center">
+  <b>An interactive terminal app that finds the caches, build output and forgotten tooling eating your disk, ranks it by size, explains each item, and cleans only what you pick.</b>
+</p>
 
-```
-  12.40 GB  [safe       ] Xcode: DerivedData
-   8.10 GB  [regenerable] Projects: node_modules (stale, git-ignored)
-   5.72 GB  [safe       ] Docker: build cache
-   ...
-```
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#usage">Usage</a> ·
+  <a href="#safety-model">Safety</a> ·
+  <a href="#what-it-finds">What it finds</a> ·
+  <a href="#contributing">Contributing</a>
+</p>
+
+<p align="center">
+  <img src="docs/assets/tui.svg" alt="reclaim TUI: items ranked by size with age and risk columns" width="860">
+</p>
 
 > **Status:** early (`0.2.0`). macOS is the primary target; Linux is supported for the XDG cache rules and the cross-platform providers (beta). Contributions are welcome, see [Contributing](#contributing).
 
+## Quick start
+
+```bash
+git clone https://github.com/hussainashraf4u/reclaim.git && cd reclaim
+python3 -m venv .venv && .venv/bin/pip install -e .
+.venv/bin/reclaim --dry-run      # look around first, nothing is ever deleted
+```
+
+## Highlights
+
+| | |
+| --- | --- |
+| 🔍 **Developer-aware** | Knows `DerivedData`, unpinned FVM SDKs, Android NDKs, stale `node_modules`, simulators, Docker, Ollama models. |
+| 🛡️ **Hard to delete the wrong thing** | Allowlisted roots only. Never touches `$HOME` or `/`. |
+| 👀 **Plan before action** | Every action shown as the exact command or path first. |
+| 🚦 **Risk-labelled** | <code>safe</code> · <code>regenerable</code> · <code>data</code> (type the id to confirm) · report-only. |
+| ⌨️ **TUI and CLI** | Filter, sort, browse folders, history. Scriptable `clean --yes` and `--json` for cron/launchd. |
+| 🧩 **Extensible** | Add a cache with 6 lines of TOML, or write a provider. |
+
+### Risk levels at a glance
+
+| Badge | Meaning | Confirmation |
+| --- | --- | --- |
+| 🟢 `safe` | Pure cache, rebuilt on demand | Plan screen |
+| 🟠 `regenerable` | Re-creatable, but costs time or bandwidth | Plan screen |
+| 🔴 `data` | Might be real data | Type the item id |
+| ⚪ report-only | Shown, never cleaned | n/a |
+
 ## Table of contents
 
+- [Quick start](#quick-start)
+- [Highlights](#highlights)
 - [Why reclaim](#why-reclaim)
 - [Install](#install)
 - [Usage](#usage)
@@ -43,7 +89,7 @@ Generic disk cleaners know about system caches but not about `DerivedData`, unpi
 ### From source (recommended while the project is young)
 
 ```bash
-git clone https://github.com/<your-username>/reclaim.git
+git clone https://github.com/hussainashraf4u/reclaim.git
 cd reclaim
 python3 -m venv .venv
 .venv/bin/pip install -e .
@@ -281,7 +327,7 @@ Contributions are very welcome, especially new cache rules and providers for too
 ### Dev setup
 
 ```bash
-git clone https://github.com/<your-username>/reclaim.git
+git clone https://github.com/hussainashraf4u/reclaim.git
 cd reclaim
 python3 -m venv .venv
 .venv/bin/pip install -e . pytest pytest-asyncio

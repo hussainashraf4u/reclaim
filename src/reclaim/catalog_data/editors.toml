@@ -1,0 +1,66 @@
+[[item]]
+id = "vscode-vsix"
+label = "VS Code downloaded extensions"
+group = "Editors"
+path = "~/Library/Application Support/Code/CachedExtensionVSIXs"
+risk = "safe"
+why = "Downloaded extension packages kept after install; the installed extensions stay."
+
+[[item]]
+id = "vscode-cacheddata"
+label = "VS Code cached data"
+group = "Editors"
+path = "~/Library/Application Support/Code/CachedData"
+risk = "safe"
+why = "Compiled JS caches; rebuilt at next launch."
+busy = ["Electron", "Code"]
+
+[[item]]
+id = "cursor-vsix"
+label = "Cursor downloaded extensions"
+group = "Editors"
+path = "~/Library/Application Support/Cursor/CachedExtensionVSIXs"
+risk = "safe"
+why = "Downloaded extension packages kept after install; the installed extensions stay."
+
+[[item]]
+id = "cursor-cacheddata"
+label = "Cursor cached data"
+group = "Editors"
+path = "~/Library/Application Support/Cursor/CachedData"
+risk = "safe"
+why = "Compiled JS caches; rebuilt at next launch."
+busy = ["Cursor"]
+
+[[item]]
+id = "jetbrains-caches"
+label = "JetBrains IDE caches"
+group = "Editors"
+path = "~/Library/Caches/JetBrains"
+risk = "regenerable"
+why = "Indexes and caches; the IDE re-indexes projects on next open (slow first start)."
+busy = ["idea", "pycharm", "webstorm", "goland", "clion", "rider", "studio"]
+
+[[item]]
+id = "lmstudio-cache"
+label = "LM Studio cache"
+group = "Local AI"
+path = "~/.cache/lm-studio"
+risk = "safe"
+why = "Download and runtime caches; models are stored elsewhere."
+
+[[item]]
+id = "lmstudio-models"
+label = "LM Studio models"
+group = "Local AI"
+path = "~/.lmstudio/models"
+risk = "data"
+why = "Downloaded LLM models. Re-downloading can take hours; delete only models you no longer use."
+
+[[item]]
+id = "whisper-models"
+label = "Whisper models"
+group = "Local AI"
+path = "~/.cache/whisper"
+risk = "regenerable"
+why = "Downloaded speech models; fetched again on next use."

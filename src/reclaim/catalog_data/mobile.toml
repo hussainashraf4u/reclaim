@@ -87,3 +87,47 @@ group = "Flutter and Android"
 path = "~/fvm/cache.git"
 risk = "regenerable"
 why = "Mirror of the Flutter repository used by fvm; re-cloned on next 'fvm install'."
+
+[[item]]
+id = "xcode-previews"
+label = "Xcode SwiftUI previews"
+group = "Xcode"
+path = "~/Library/Developer/Xcode/UserData/Previews"
+risk = "safe"
+why = "Generated SwiftUI preview data; Xcode rebuilds it when a preview is opened."
+busy = ["Xcode"]
+
+[[item]]
+id = "watchos-devicesupport"
+label = "watchOS DeviceSupport"
+group = "Xcode"
+glob = "~/Library/Developer/Xcode/watchOS DeviceSupport/*"
+risk = "regenerable"
+why = "Debug symbols copied from a paired watch; Xcode re-creates them on next connect."
+busy = ["Xcode"]
+
+[[item]]
+id = "tvos-devicesupport"
+label = "tvOS DeviceSupport"
+group = "Xcode"
+glob = "~/Library/Developer/Xcode/tvOS DeviceSupport/*"
+risk = "regenerable"
+why = "Debug symbols copied from an Apple TV; Xcode re-creates them on next connect."
+busy = ["Xcode"]
+
+[[item]]
+id = "swiftpm-cache"
+label = "Swift Package Manager cache"
+group = "Xcode"
+path = "~/Library/Caches/org.swift.swiftpm"
+risk = "regenerable"
+why = "Cloned package repositories and manifests; re-fetched on next resolve."
+
+[[item]]
+id = "gradle-daemon-logs"
+label = "Gradle daemon logs"
+group = "Flutter and Android"
+path = "~/.gradle/daemon"
+risk = "safe"
+why = "Daemon logs and registry; Gradle recreates them. Stop daemons first if one is running."
+busy = ["java"]

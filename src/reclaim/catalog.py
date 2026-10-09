@@ -77,7 +77,7 @@ def load_catalog(directory: Path | None = None) -> list[CatalogEntry]:
 
 
 def _expand(entry: CatalogEntry, home: Path) -> list[tuple[str, str, Path]]:
-    pattern = entry.path or entry.glob
+    pattern = entry.path or entry.glob or ""
     full = str(home / pattern[2:]) if pattern.startswith("~/") else pattern
     if entry.glob:
         return [

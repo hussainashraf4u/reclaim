@@ -1,0 +1,75 @@
+# XDG-style locations used on Linux. Paths that do not exist on a machine are simply not listed.
+
+[[item]]
+id = "xdg-pip-cache"
+label = "pip cache (XDG)"
+group = "Python"
+path = "~/.cache/pip"
+risk = "safe"
+why = "Downloaded wheels and HTTP cache; pip fetches them again."
+
+[[item]]
+id = "xdg-poetry-cache"
+label = "Poetry cache (XDG)"
+group = "Python"
+path = "~/.cache/pypoetry"
+risk = "regenerable"
+why = "Downloaded packages and virtualenvs created by Poetry; recreated on 'poetry install'."
+
+[[item]]
+id = "xdg-yarn-cache"
+label = "Yarn cache (XDG)"
+group = "JavaScript"
+path = "~/.cache/yarn"
+risk = "safe"
+why = "Downloaded packages; Yarn fetches them again."
+
+[[item]]
+id = "xdg-pnpm-store"
+label = "pnpm store (XDG)"
+group = "JavaScript"
+path = "~/.local/share/pnpm/store"
+risk = "regenerable"
+why = "Content-addressable package store; projects relink from the network when it is gone."
+
+[[item]]
+id = "xdg-go-build"
+label = "Go build cache (XDG)"
+group = "Rust, Go and Java"
+path = "~/.cache/go-build"
+risk = "safe"
+why = "Compiled package cache; rebuilt on demand."
+
+[[item]]
+id = "xdg-homebrew"
+label = "Homebrew downloads (Linuxbrew)"
+group = "System"
+path = "~/.cache/Homebrew"
+risk = "safe"
+why = "Old bottles and downloads."
+clean = { run = ["brew", "cleanup", "-s"] }
+needs = "brew"
+
+[[item]]
+id = "xdg-thumbnails"
+label = "Thumbnail cache"
+group = "System"
+path = "~/.cache/thumbnails"
+risk = "safe"
+why = "Generated image previews; recreated when folders are browsed."
+
+[[item]]
+id = "xdg-trash"
+label = "Trash (XDG)"
+group = "System"
+glob = "~/.local/share/Trash/files/*"
+risk = "data"
+why = "Items you deleted but did not empty. Emptying the Trash is permanent."
+
+[[item]]
+id = "xdg-composer-cache"
+label = "Composer cache (XDG)"
+group = "Languages"
+path = "~/.cache/composer"
+risk = "safe"
+why = "Downloaded PHP packages; fetched again on install."

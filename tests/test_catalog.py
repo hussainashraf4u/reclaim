@@ -128,3 +128,11 @@ def test_shipped_catalog_is_valid_and_within_allowlist(tmp_path):
         sample = tmp_path / pattern[2:].replace("*", "sample")
         sample.mkdir(parents=True, exist_ok=True)
         check_removable(sample, roots, tmp_path)
+
+
+def test_new_catalog_entries_present_and_careful():
+    by_id = {e.id: e for e in load_catalog()}
+    for key in ("xcode-previews", "swiftpm-cache", "vscode-vsix", "jetbrains-caches", "zig-cache", "xdg-pip-cache"):
+        assert key in by_id, key
+    assert by_id["lmstudio-models"].risk is Risk.DATA
+    assert by_id["xdg-trash"].risk is Risk.DATA

@@ -22,6 +22,10 @@ _TREE_ROOTS = (
     "Library/Developer/Xcode/Archives",
     "Library/Developer/Xcode/iOS DeviceSupport",
     "Library/Application Support/Claude/vm_bundles",
+    "Library/Developer/Xcode/watchOS DeviceSupport",
+    "Library/Developer/Xcode/tvOS DeviceSupport",
+    ".gem/ruby",
+    ".local/share/Trash/files",
 )
 
 _EXACT_ROOTS = (
@@ -33,6 +37,17 @@ _EXACT_ROOTS = (
     ".fastlane",
     "fvm/cache.git",
     "Library/Developer/CoreSimulator/Caches",
+    "Library/Developer/Xcode/UserData/Previews",
+    "Library/Application Support/Code/CachedExtensionVSIXs",
+    "Library/Application Support/Code/CachedData",
+    "Library/Application Support/Cursor/CachedExtensionVSIXs",
+    "Library/Application Support/Cursor/CachedData",
+    ".expo/versions",
+    ".nuget/packages",
+    ".bundle/cache",
+    ".ivy2/cache",
+    ".lmstudio/models",
+    ".local/share/pnpm/store",
 )
 
 

@@ -73,3 +73,43 @@ group = "JavaScript"
 path = "~/Library/Caches/Cypress"
 risk = "regenerable"
 why = "Cypress app binaries; re-downloaded on next install."
+
+[[item]]
+id = "electron-cache"
+label = "Electron downloads"
+group = "JS"
+path = "~/Library/Caches/electron"
+risk = "safe"
+why = "Downloaded Electron binaries; fetched again on the next install."
+
+[[item]]
+id = "electron-cache-xdg"
+label = "Electron downloads (.cache)"
+group = "JS"
+path = "~/.cache/electron"
+risk = "safe"
+why = "Downloaded Electron binaries; fetched again on the next install."
+
+[[item]]
+id = "turbo-cache"
+label = "Turborepo daemon cache"
+group = "JS"
+path = "~/.cache/turbo"
+risk = "safe"
+why = "Local task cache; tasks re-run and refill it."
+
+[[item]]
+id = "expo-cache"
+label = "Expo downloads"
+group = "JS"
+path = "~/.expo/versions"
+risk = "regenerable"
+why = "Downloaded Expo Go builds for simulators; fetched again when needed."
+
+[[item]]
+id = "node-corepack"
+label = "Corepack package managers"
+group = "JS"
+path = "~/.cache/node/corepack"
+risk = "safe"
+why = "Downloaded yarn/pnpm shims; Corepack fetches them on demand."

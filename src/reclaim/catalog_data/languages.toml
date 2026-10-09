@@ -41,3 +41,59 @@ group = "Rust, Go and Java"
 path = "~/.m2/repository"
 risk = "data"
 why = "Downloaded artifacts plus anything installed locally with 'mvn install', which cannot be re-fetched."
+
+[[item]]
+id = "zig-cache"
+label = "Zig cache"
+group = "Languages"
+path = "~/.cache/zig"
+risk = "safe"
+why = "Compiler artifacts cache; rebuilt on demand."
+
+[[item]]
+id = "nuget-packages"
+label = "NuGet packages"
+group = "Languages"
+path = "~/.nuget/packages"
+risk = "regenerable"
+why = "Restored .NET packages; 'dotnet restore' downloads them again."
+
+[[item]]
+id = "composer-cache"
+label = "Composer cache"
+group = "Languages"
+path = "~/Library/Caches/composer"
+risk = "safe"
+why = "Downloaded PHP packages; fetched again on install."
+
+[[item]]
+id = "bundler-cache"
+label = "Bundler cache"
+group = "Languages"
+path = "~/.bundle/cache"
+risk = "safe"
+why = "Cached gems; Bundler downloads them again."
+
+[[item]]
+id = "gem-cache"
+label = "RubyGems download cache"
+group = "Languages"
+glob = "~/.gem/ruby/*/cache"
+risk = "safe"
+why = "Downloaded .gem files; the installed gems are kept."
+
+[[item]]
+id = "sbt-ivy"
+label = "sbt / Ivy cache"
+group = "Languages"
+path = "~/.ivy2/cache"
+risk = "regenerable"
+why = "Scala dependency cache; re-downloaded on next build."
+
+[[item]]
+id = "deno-cache"
+label = "Deno cache"
+group = "Languages"
+path = "~/Library/Caches/deno"
+risk = "safe"
+why = "Cached remote modules and compiled output; re-fetched on next run."

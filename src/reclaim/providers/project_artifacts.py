@@ -3,9 +3,9 @@ from __future__ import annotations
 import hashlib
 import os
 import sys
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Iterator
 
 from reclaim.context import ScanContext
 from reclaim.model import Item, RemovePath, Risk
@@ -97,4 +97,6 @@ class ProjectArtifactsProvider:
             risk=Risk.REGENERABLE,
             why="Build or dependency output of a project not touched recently; rebuilt by the project's tooling.",
             actions=(RemovePath(path),),
+            path=path,
+            age_days=age,
         )

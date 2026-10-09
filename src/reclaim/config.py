@@ -23,13 +23,18 @@ class Config:
     big_file_mb: int = 500
     duplicate_min_mb: int = 100
     use_trash: bool = False
+    ai_provider: str = "none"
+    ai_model: str | None = None
+    ai_base_url: str | None = None
+    ai_limit: int = 15
+    ai_auto_review: bool = True
 
 
 def default_config_path(home: Path) -> Path:
     return home / ".config" / "reclaim" / "config.toml"
 
 
-_KEYS = frozenset({"project_roots", "extra_allowlist", "ignore", "min_size_mb", "stale_days", "large_dir_mb", "use_trash", "big_file_mb", "duplicate_min_mb"})
+_KEYS = frozenset({"project_roots", "extra_allowlist", "ignore", "min_size_mb", "stale_days", "large_dir_mb", "use_trash", "big_file_mb", "duplicate_min_mb", "ai_provider", "ai_model", "ai_base_url", "ai_limit", "ai_auto_review"})
 _SENSITIVE = frozenset({".ssh", ".gnupg", "Keychains"})
 
 
@@ -92,7 +97,23 @@ def load_config(path: Path, home: Path) -> Config:
     use_trash = data.get("use_trash", False)
     if not isinstance(use_trash, bool):
         raise ConfigError(f"{path}: 'use_trash' must be true or false")
+    ai = {}
+    for key in ("ai_provider", "ai_model", "ai_base_url"):
+        value = data.get(key)
+        if value is not None and not isinstance(value, str):
+            raise ConfigError(f"{path}: '{key}' must be a string")
+        ai[key] = value
+    if ai["ai_provider"] not in (None, "none", "ollama", "anthropic"):
+        raise ConfigError(f"{path}: 'ai_provider' must be none, ollama or anthropic")
+    ai_auto_review = data.get("ai_auto_review", True)
+    if not isinstance(ai_auto_review, bool):
+        raise ConfigError(f"{path}: 'ai_auto_review' must be true or false")
     return Config(
+        ai_limit=_int(data, "ai_limit", 15, path, 1),
+        ai_auto_review=ai_auto_review,
+        ai_provider=ai["ai_provider"] or "none",
+        ai_model=ai["ai_model"],
+        ai_base_url=ai["ai_base_url"],
         project_roots=_paths(data, "project_roots", home, path),
         extra_allowlist=_paths(data, "extra_allowlist", home, path),
         ignore=frozenset(ignore),
@@ -117,4 +138,16 @@ def set_ignore(path: Path, ids: set[str]) -> None:
         text = _IGNORE_RE.sub(lambda _: line, text, count=1)
     else:
         text = (text.rstrip("\n") + "\n" if text.strip() else "") + line + "\n"
+    path.write_text(text, encoding="utf-8")
+
+
+def set_keys(path: Path, values: dict[str, str | int | bool | None]) -> None:
+    """Set or remove top-level scalar keys (None removes), leaving the rest of the file untouched."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    for key, value in values.items():
+        pattern = re.compile(rf"^{re.escape(key)}\s*=.*\n?", re.MULTILINE)
+        text = pattern.sub("", text)
+        if value is not None:
+            text = (text.rstrip("\n") + "\n" if text.strip() else "") + f"{key} = {json.dumps(value)}\n"
     path.write_text(text, encoding="utf-8")

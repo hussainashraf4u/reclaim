@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import inspect
 import os
+import textwrap
+import time
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.css.query import NoMatches
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import (
@@ -25,17 +29,22 @@ from textual.widgets import (
 )
 
 from reclaim import scancache
+from reclaim.ai.queue import Outcome, ReviewQueue
+from reclaim.ai.settings import AiSettings
+from reclaim.ai.setup import AiEnv
 from reclaim.audit import default_log_path, read_log, summarize
 from reclaim.config import set_ignore
 from reclaim.context import ScanContext
 from reclaim.executor import describe
-from reclaim.model import Item, Risk
+from reclaim.model import Advice, AdviceLevel, Item, Risk
 from reclaim.runner import execute_items
 from reclaim.safety import default_roots
 from reclaim.scan import dedupe, drop_covered, scan_all
 from reclaim.selection import Selection, confirmation_ok, human, summary_text
+from reclaim.tui_ai import AiPanel, AiSettingsScreen, ReviewActivity, panel_text
 
 _GROUP_PREFIX = "group:"
+PANEL_MIN_WIDTH = 110  # narrower terminals start with the AI panel hidden
 
 _RISK_STYLE = {Risk.SAFE: "green", Risk.REGENERABLE: "yellow", Risk.DATA: "bold red"}
 
@@ -50,8 +59,12 @@ _TABS: tuple[tuple[str, str, Callable[[Item], bool]], ...] = (
 _TAB_FILTERS = {tab_id: pred for tab_id, _, pred in _TABS}
 
 
+_ADVICE_STYLE = {AdviceLevel.OK: "green", AdviceLevel.CAUTION: "yellow", AdviceLevel.KEEP: "bold red"}
+_ADVICE_MARK = {AdviceLevel.OK: "ok", AdviceLevel.CAUTION: "!", AdviceLevel.KEEP: "!!"}
+
 _SELECTED_STYLE = "#400000 on #ffcccc"
-_NOTE_WIDTH = 32
+_NOTE_WIDTH = 40
+NOTE_LINES = 2
 
 
 def _pad(text: str, width: int = 0) -> str:
@@ -264,6 +277,19 @@ def history_lines(log_path: Path) -> list[str]:
     return lines
 
 
+def advice_note(advice: Advice | None) -> str:
+    """Everything the review said, on one line, or '' when there is no review."""
+    if advice is None:
+        return ""
+    text = f"{_ADVICE_MARK[advice.level]} {advice.reason}".rstrip()
+    return f"{text} (rebuild: {advice.rebuild})" if advice.rebuild else text
+
+
+def note_lines(text: str) -> list[str]:
+    """The note wrapped to the column, at most NOTE_LINES lines, with an ellipsis when it had to be cut."""
+    return textwrap.wrap(text, _NOTE_WIDTH - 2, max_lines=NOTE_LINES, placeholder="…") or [""]
+
+
 def detail_lines(item: Item) -> list[str]:
     lines = [item.label, f"Group: {item.group}", f"Size: {human(item.size_bytes)}", f"Risk: {item.risk.value}"]
     if item.path is not None:
@@ -275,6 +301,10 @@ def detail_lines(item: Item) -> list[str]:
         lines.append(f"Since last scan: {sign}{human(abs(item.delta_bytes))}")
     if item.why:
         lines.append(f"Why: {item.why}")
+    if item.advice is not None:
+        lines.append(f"AI review: {item.advice.level.value} - {item.advice.reason}")
+        if item.advice.rebuild:
+            lines.append(f"Rebuild cost: {item.advice.rebuild}")
     if item.disabled_reason:
         lines.append(f"Disabled: {item.disabled_reason}")
     if item.report_only:
@@ -295,15 +325,18 @@ class ReclaimApp(App):
         Binding("4", "show_tab('tab-data')", "Data", show=False),
         Binding("5", "show_tab('tab-report')", "Report-only", show=False),
         ("space", "toggle", "Select"),
-        ("a", "select_safe", "All safe"),
         ("c", "plan", "Plan"),
+        Binding("comma", "ai_settings", "AI setup", key_display=","),
+        ("slash", "focus_filter", "Filter"),
+        ("q", "quit", "Quit"),
+        ("a", "select_safe", "All safe"),
         ("s", "cycle_sort", "Sort"),
         ("i", "ignore_item", "Ignore"),
         ("h", "history", "History"),
         ("d", "drill", "Browse"),
-        ("slash", "focus_filter", "Filter"),
-        ("escape", "clear_filter", "Clear filter"),
-        ("q", "quit", "Quit"),
+        ("r", "ai_review", "Review"),
+        ("p", "toggle_ai_panel", "Panel"),
+        Binding("escape", "clear_filter", "Clear filter", show=False),
     ]
 
     def __init__(
@@ -318,8 +351,23 @@ class ReclaimApp(App):
         config_path: Path | None = None,
         sizer: Callable[[Path], int] | None = None,
         previous: dict[str, int] | None = None,
+        ai_settings: AiSettings | None = None,
+        ai_env: AiEnv | None = None,
+        review: Callable[..., object] | None = None,
+        ai_cache_path: Path | None = None,
     ):
         super().__init__()
+        self.ai_settings = ai_settings or AiSettings()
+        self.ai_env = ai_env
+        self._review = review
+        self.ai_cache_path = ai_cache_path
+        self.activity: ReviewActivity | None = None
+        self._last_chunk_ui = 0.0
+        self._pending_chunks: list[str] = []
+        self._panel_key: str | None = None
+        self._note_col = None
+        self.queue = ReviewQueue(self._review_one, self._queue_emit) if review is not None else None
+        self.scanning = True
         self.use_trash = use_trash
         self.config_path = config_path
         self.sizer = sizer
@@ -342,6 +390,10 @@ class ReclaimApp(App):
         self.sub_title = "DRY RUN" if dry_run else ""
         self._run_screen: RunScreen | None = None
 
+    def query_one(self, *args, **kwargs):  # type: ignore[override]
+        """Always the main screen: scan and review results keep arriving while a dialog is open."""
+        return self.screen_stack[0].query_one(*args, **kwargs)
+
     def compose(self) -> ComposeResult:
         yield Header()
         yield Tabs(*(Tab(label, id=tab_id) for tab_id, label, _ in _TABS), id="tabs")
@@ -349,13 +401,16 @@ class ReclaimApp(App):
         yield DataTable(cursor_type="row", cell_padding=0)
         yield LoadingIndicator(id="scanning")
         yield Static(id="status")
+        yield AiPanel(id="ai-panel")
         yield Footer()
 
     def on_mount(self) -> None:
         self.query_one("#filter", Input).display = False
+        self.query_one("#ai-panel", AiPanel).display = self.size.width >= PANEL_MIN_WIDTH
+        self._refresh_panel()
         table = self.query_one(DataTable)
         self._mark_col = table.add_column("   ")
-        table.add_columns(" Item ", " Size ", " Age ", " Risk ", _pad(" Note ", _NOTE_WIDTH))
+        *_, self._note_col = table.add_columns(" Item ", " Size ", " Age ", " Risk ", _pad(" Note ", _NOTE_WIDTH))
         self.query_one(DataTable).focus()
         self.run_worker(self._scan_worker, thread=True)
 
@@ -377,8 +432,159 @@ class ReclaimApp(App):
 
     def _scan_done(self) -> None:
         self.progress = ""
+        self.scanning = False
         self.query_one("#scanning", LoadingIndicator).display = False
         self._update_status()
+
+    # --- AI advisor ---
+    @property
+    def reviewing(self) -> bool:
+        return self.queue is not None and not self.queue.idle()
+
+    @property
+    def ai_status(self) -> str:
+        if not self.ai_settings.enabled:
+            return "| AI off (, to set up) "
+        counts = self.queue.counts() if self.queue is not None else {}
+        left = counts.get("queued", 0) + counts.get("running", 0)
+        flagged = sum(1 for i in self._raw if i.advice is not None and i.advice.level is not AdviceLevel.OK)
+        if self.queue is not None and self.queue.paused:
+            return f"| AI paused, {left} waiting "
+        return f"| AI reviewing, {left} left, {flagged} flagged " if left else f"| AI flagged {flagged} "
+
+    def action_toggle_ai_panel(self) -> None:
+        panel = self.query_one("#ai-panel", AiPanel)
+        panel.display = not panel.display
+        self._refresh_panel()
+
+    def _cursor_item(self) -> Item | None:
+        key = self._cursor_id()
+        return next((i for i in self.items if i.id == key), None)
+
+    def _refresh_panel(self) -> None:
+        panel = self.query_one("#ai-panel", AiPanel)
+        if not panel.display:
+            return
+        item = self._cursor_item()
+        key = item.id if item is not None else None
+        reset = key != self._panel_key
+        self._panel_key = key
+        flagged = [i for i in self.items if i.advice is not None and i.advice.level is not AdviceLevel.OK]
+        queue = self.queue
+        panel.show(
+            panel_text(
+                item,
+                self.ai_settings,
+                queue.counts() if queue is not None else {},
+                flagged,
+                queue.state(item.id) if queue is not None and item is not None else None,
+                self.activity,
+                queue.paused if queue is not None else False,
+            ),
+            reset=reset,
+        )
+
+    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        self._refresh_panel()
+
+    def action_ai_review(self) -> None:
+        """Review the highlighted item next."""
+        if not self.ai_settings.enabled or self.queue is None:
+            self.notify("AI is off. Press , to set it up", severity="warning")
+            return
+        item = self._cursor_item()
+        if item is None:
+            self.notify("Highlight an item to review", severity="warning")
+            return
+        outcome = self.queue.bump(item)
+        self.notify(
+            {"running": "Already reviewing this item", "queued": "Moved to the front of the queue"}.get(
+                outcome, "Reviewing again, ignoring saved answers"
+            )
+        )
+        self._update_note(item)
+        self._update_status()
+        self._refresh_panel()
+
+    def _enqueue(self, items: list[Item]) -> None:
+        if self.queue is None or not self.ai_settings.enabled or not self.ai_settings.auto_review:
+            return
+        for item in items:
+            if item.id not in self.ignore:
+                self.queue.put(item)
+
+    # Queue callbacks run on the worker thread; each hops to the UI thread.
+    def _review_one(self, item: Item, on_event: Callable[[str, str], None], fresh: bool) -> Outcome:
+        assert self._review is not None
+        result = self._review(replace(item), self.ai_settings, on_event, fresh)
+        return result if isinstance(result, Outcome) else Outcome()
+
+    def _queue_emit(self, event: str, item_id: str, text: str, outcome: Outcome | None) -> None:
+        if event == "chunk":
+            # Tokens arrive far faster than the screen needs: forward them a few times a second.
+            self._pending_chunks.append(text)
+            now = time.monotonic()
+            if now - self._last_chunk_ui < 0.1:
+                return
+            self._last_chunk_ui = now
+            text = "".join(self._pending_chunks)
+            self._pending_chunks.clear()
+        elif event in ("start", "done"):
+            self._pending_chunks.clear()
+        try:
+            self.call_from_thread(self._queue_event, event, item_id, text, outcome)
+        except RuntimeError:  # app is closing
+            pass
+
+    def _queue_event(self, event: str, item_id: str, text: str, outcome: Outcome | None) -> None:
+        try:
+            self._apply_queue_event(event, item_id, text, outcome)
+        except NoMatches:  # the screen is already being torn down
+            pass
+
+    def _apply_queue_event(self, event: str, item_id: str, text: str, outcome: Outcome | None) -> None:
+        item = next((i for i in self._raw if i.id == item_id), None)
+        if event == "start" and item is not None:
+            self.activity = ReviewActivity(item.id, item.label)
+        elif event in ("step", "chunk"):
+            if self.activity is not None and self.activity.item_id == item_id:
+                (self.activity.add_step if event == "step" else self.activity.add_chunk)(text)
+        elif event == "done":
+            if self.activity is not None and self.activity.item_id == item_id:
+                self.activity.finish()
+            if item is not None and outcome is not None:
+                item.advice = outcome.advice
+        elif event == "paused":
+            self.notify(f"AI review paused after repeated failures: {text}. Press r to resume.", severity="warning")
+        if item is not None and event in ("start", "done"):
+            self._update_note(item)
+        if event != "chunk":
+            self._update_status()
+        self._refresh_panel()
+
+    def action_ai_settings(self) -> None:
+        if self.executing:
+            return
+        self.push_screen(
+            AiSettingsScreen(self.ai_settings, self.config_path, self.ai_env or AiEnv(), self.ai_cache_path),
+            self._after_ai_settings,
+        )
+
+    def _after_ai_settings(self, new: AiSettings | None) -> None:
+        if new is None:
+            return
+        self.ai_settings = new
+        self.activity = None
+        if self.queue is not None:
+            self.queue.clear()
+        if not new.enabled:
+            for item in self._raw:
+                item.advice = None
+            self.notify("AI advisor turned off")
+        else:
+            self.notify(f"AI advisor on ({new.provider})")
+            self._enqueue(self._raw)
+        self._render_rows()
 
     def _set_errors(self, errors: list[str]) -> None:
         self.scan_errors = errors
@@ -388,6 +594,8 @@ class ReclaimApp(App):
     def add_items(self, batch: list[Item]) -> None:
         scancache.annotate(self.previous, batch)
         self._raw = drop_covered(dedupe(self._raw + batch))
+        known = {i.id: i for i in self._raw}
+        self._enqueue([known[i.id] for i in batch if i.id in known])
         self._refresh_items()
 
     def _refresh_items(self) -> None:
@@ -481,17 +689,42 @@ class ReclaimApp(App):
         for group, members in self._grouped():
             total = sum(i.size_bytes for i in members)
             table.add_row("", Text(_pad(f"{group} ({len(members)})"), style="bold"), Text(_pad(human(total)), style="bold"), "", "", "", key=f"{_GROUP_PREFIX}{group}")
+            height = NOTE_LINES if self.ai_settings.enabled else 1
             for item in members:
-                table.add_row(*self._cells(item), key=item.id)
+                table.add_row(*self._cells(item), height=height, key=item.id)
         self._update_tab_labels()
         self._update_status()
+        self._refresh_panel()
+
+    def _note_cell(self, item: Item) -> Text:
+        ticked = self.selection.is_ticked(item.id)
+        style = _SELECTED_STYLE if ticked else ""
+        state = self.queue.state(item.id) if self.queue is not None and self.ai_settings.enabled else None
+        if item.advice is not None:
+            text, style = advice_note(item.advice), style or _ADVICE_STYLE[item.advice.level]
+        elif item.disabled_reason or item.report_only:
+            text = item.disabled_reason or "report only"
+        elif state in ("queued", "running"):
+            text, style = f"ai: {'reviewing...' if state == 'running' else 'queued'}", style or "dim"
+        elif item.delta_bytes:
+            text = f"{'+' if item.delta_bytes > 0 else '-'}{human(abs(item.delta_bytes))} since last scan"
+        else:
+            text = ""
+        lines = note_lines(text) if self.ai_settings.enabled else [text[: _NOTE_WIDTH - 3] + "…" if len(text) > _NOTE_WIDTH - 2 else text]
+        return Text("\n".join(_pad(line, _NOTE_WIDTH) for line in lines), style=style)
+
+    def _update_note(self, item: Item) -> None:
+        """Redraw just this row's note, so the cursor and scroll position stay put."""
+        if self._note_col is None:
+            return
+        try:
+            self.query_one(DataTable).update_cell(item.id, self._note_col, self._note_cell(item))
+        except Exception:  # row not on screen (filtered out or mid re-render)
+            pass
 
     def _cells(self, item: Item) -> list[Text]:
         ticked = self.selection.is_ticked(item.id)
         base = _SELECTED_STYLE if ticked else ""
-        note = item.disabled_reason or ("report only" if item.report_only else "")
-        if not note and item.delta_bytes:
-            note = f"{'+' if item.delta_bytes > 0 else '-'}{human(abs(item.delta_bytes))} since last scan"
         risk = Text(_pad(item.risk.value), style=base) if ticked else Text.assemble(" ", risk_text(item.risk, dim=item.report_only), " ")
         return [
             Text(" [x] " if ticked else " [ ] ", style=base),
@@ -499,12 +732,12 @@ class ReclaimApp(App):
             Text(_pad(human(item.size_bytes)), style=base),
             Text(_pad(f"{item.age_days}d" if item.age_days is not None else ""), style=base),
             risk,
-            Text(_pad(note, _NOTE_WIDTH), style=base),
+            self._note_cell(item),
         ]
 
     def _update_status(self, extra: str = "") -> None:
         errors = f" | {len(self.scan_errors)} scan error(s)" if self.scan_errors else ""
-        text = f"{summary_text(self.items, self.selection.selected_bytes)}{errors} {self.progress}{extra}"
+        text = f"{summary_text(self.items, self.selection.selected_bytes)}{errors} {self.progress}{self.ai_status}{extra}"
         self.query_one("#status", Static).update(Text(text))
 
     def _cursor_id(self) -> str | None:
@@ -572,6 +805,9 @@ class ReclaimApp(App):
             self.notify("Nothing selected", severity="warning")
             return
         lines = self.selection.plan_lines(self.roots, self.home, self._trash_dir())
+        flagged = [i for i in self.selection.selected if i.advice is not None and i.advice.level is not AdviceLevel.OK]
+        if flagged:
+            lines = [*lines, "", "AI notes (advice only):", *(f"  [{i.advice.level.value}] {i.label}: {i.advice.reason}" for i in flagged if i.advice)]
         self.push_screen(PlanScreen(lines, self.selection.data_ids, self.dry_run), self._after_plan)
 
     def _trash_dir(self) -> Path | None:
@@ -630,7 +866,22 @@ def run_app(
     ignore=frozenset(),
     use_trash: bool = False,
     config_path: Path | None = None,
+    ai_settings: AiSettings | None = None,
 ) -> None:
+    from reclaim.ai.advisor import advise_one
+    from reclaim.ai.provider import build_provider
+    from reclaim.ai.setup import default_cache_path as ai_cache
+
+    ai_cache_path = ai_cache(ctx.home)
+
+    def review(item, settings, on_event, fresh):
+        try:
+            provider = build_provider(settings.provider, settings.model, settings.base_url, ctx.env)
+        except ValueError as exc:
+            return Outcome(None, str(exc))
+        result = advise_one(item, ctx, provider, ai_cache_path, on_event, use_cache=not fresh)
+        return Outcome(result.advice.get(item.id), str(result.error) if result.error else None)
+
     cache_path = scancache.default_cache_path(ctx.home)
     previous = scancache.load(cache_path)
 
@@ -649,4 +900,8 @@ def run_app(
         config_path=config_path,
         sizer=ctx.sizer,
         previous=previous,
+        ai_settings=ai_settings,
+        ai_env=AiEnv(which=ctx.which, env=ctx.env),
+        review=review,
+        ai_cache_path=ai_cache_path,
     ).run()

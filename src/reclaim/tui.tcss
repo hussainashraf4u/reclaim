@@ -62,3 +62,60 @@ Tabs {
 DataTable {
     height: 1fr;
 }
+
+#dialog.tall {
+    height: 92%;
+}
+
+#dialog.tall #settings-form {
+    height: 1fr;
+    max-height: 100%;
+}
+
+#settings-form .hint {
+    color: $text-muted;
+    margin-top: 1;
+}
+
+#ai-auto-row {
+    height: 3;
+    align-horizontal: left;
+}
+
+#ai-status {
+    margin-top: 1;
+}
+
+Screen {
+    layers: base overlay;
+}
+
+#ai-panel {
+    layer: overlay;
+    dock: right;
+    width: 42;
+    height: 1fr;
+    margin: 1 0 2 0;
+    padding: 1 2;
+    border: round $primary;
+    background: $surface;
+}
+
+#ai-panel .title {
+    text-style: bold;
+}
+
+#ai-panel-scroll {
+    height: 1fr;
+    margin: 1 0;
+    scrollbar-gutter: stable;
+}
+
+#ai-panel-buttons {
+    height: 3;
+    align-horizontal: right;
+}
+
+#ai-panel-buttons Button {
+    margin-left: 1;
+}

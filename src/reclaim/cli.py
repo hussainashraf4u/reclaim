@@ -8,9 +8,10 @@ import time
 from pathlib import Path
 
 from reclaim import __version__, scancache
+from reclaim.ai.settings import AiSettings
 from reclaim.audit import default_log_path, read_log, summarize
 from reclaim.catalog import load_catalog
-from reclaim.config import Config, ConfigError, default_config_path, load_config, set_ignore
+from reclaim.config import Config, ConfigError, default_config_path, load_config, set_ignore, set_keys
 from reclaim.context import ScanContext
 from reclaim.executor import describe, describe_trash
 from reclaim.model import Item, RemovePath, Risk
@@ -66,6 +67,20 @@ def _parser() -> argparse.ArgumentParser:
 
     doc = sub.add_parser("doctor", help="explain what each scanner found and why one may be empty")
     _add_common(doc, sub=True)
+
+    adv = sub.add_parser("advise", help="AI second opinion on what is safe to clean (heuristics only until `ai enable`)")
+    _add_common(adv, sub=True)
+    adv.add_argument("--limit", type=_non_negative, default=None, help="largest N cleanable items to review (default: ai_limit, 15)")
+    adv.add_argument("--no-cache", action="store_true", help="ask the model again instead of reusing earlier answers")
+    adv.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
+
+    ai = sub.add_parser("ai", help="enable, disable or inspect the optional AI advisor")
+    _add_common(ai, sub=True)
+    ai.add_argument("action", choices=["enable", "disable", "status"])
+    ai.add_argument("--provider", choices=["ollama", "anthropic"], default="ollama", help="with enable (default ollama, runs locally)")
+    ai.add_argument("--model", help="with enable: model name")
+    ai.add_argument("--base-url", help="with enable: provider URL")
+    ai.add_argument("--yes", action="store_true", help="with enable: download the model without asking")
 
     for name, text in (("ignore", "hide an item id from every scan"), ("unignore", "stop hiding an item id")):
         s = sub.add_parser(name, help=text)
@@ -184,6 +199,70 @@ def _clean(args, ctx: ScanContext, cfg: Config, entries, providers, out) -> int:
     return EXIT_FAILED if summary.failed else 0
 
 
+def _ai(args, ctx: ScanContext, cfg: Config, config_path: Path, out) -> int:
+    from reclaim.ai import setup
+
+    if args.action == "status":
+        out.write(f"ai_provider: {cfg.ai_provider}\n")
+        if cfg.ai_provider != "none":
+            out.write(f"ai_model: {cfg.ai_model or '(provider default)'}\n")
+        return 0
+    if args.action == "disable":
+        set_keys(config_path, {"ai_provider": None, "ai_model": None, "ai_base_url": None})
+        out.write("AI advisor disabled. Downloaded models are left in place (remove with `ollama rm <model>`).\n")
+        return 0
+    if args.provider == "ollama":
+        model = args.model or setup.DEFAULT_OLLAMA_MODEL
+        res = setup.enable_ollama(
+            model,
+            args.base_url or setup.DEFAULT_OLLAMA_URL,
+            confirm=lambda q: args.yes or input(f"{q} [y/N] ").strip().lower() in ("y", "yes"),
+            env=setup.AiEnv(which=ctx.which, env=ctx.env),
+        )
+    else:
+        model = args.model
+        res = setup.enable_anthropic(ctx.env)
+    out.write(res.message + "\n")
+    if not res.ok:
+        return EXIT_FAILED
+    set_keys(config_path, {"ai_provider": args.provider, "ai_model": model, "ai_base_url": args.base_url})
+    out.write(f"AI advisor enabled ({args.provider}). Try: reclaim advise\n")
+    return 0
+
+
+def _advise(args, ctx: ScanContext, cfg: Config, entries, providers, out) -> int:
+    from reclaim.ai import setup
+    from reclaim.ai.advisor import advise
+    from reclaim.ai.provider import build_provider
+
+    try:
+        provider = build_provider(cfg.ai_provider, cfg.ai_model, cfg.ai_base_url, ctx.env)
+    except ValueError as exc:
+        sys.stderr.write(f"reclaim: {exc}\n")
+        return EXIT_CONFIG
+    result = scan_all(ctx, entries, providers, ignore=cfg.ignore)
+    cache = None if args.no_cache else setup.default_cache_path(ctx.home)
+    res = advise(result.items, ctx, provider, cache, cfg.ai_limit if args.limit is None else args.limit)
+    reviewed = [i for i in result.items if i.advice is not None]
+    if getattr(args, "json", False):
+        out.write(json.dumps({"version": 1, "provider": cfg.ai_provider, "error": str(res.error) if res.error else None,
+                              "items": [i.to_json() for i in reviewed]}, ensure_ascii=False, indent=2) + "\n")
+        return 0
+    if provider is None:
+        out.write("AI is off: showing offline checks only. Run `reclaim ai enable` for model review.\n")
+    for item in reviewed:
+        a = item.advice
+        assert a is not None
+        out.write(f"{human(item.size_bytes):>10}  [{a.level.value:7}] {item.label}\n            {a.reason}\n")
+        if a.rebuild:
+            out.write(f"            rebuild: {a.rebuild}\n")
+    if not reviewed:
+        out.write("Nothing to flag.\n")
+    if res.error:
+        out.write(f"AI review failed ({res.error}); showing offline checks only.\n")
+    return 0
+
+
 def _doctor(ctx: ScanContext, cfg: Config, config_path: Path, entries, providers, out) -> int:
     out.write(f"config: {config_path} ({'found' if config_path.exists() else 'not found, using defaults'})\n")
     out.write(f"project_roots: {', '.join(str(p) for p in cfg.project_roots) or '(none)'}\n")
@@ -225,8 +304,12 @@ def main(argv=None, out=None, ctx: ScanContext | None = None, entries=None, laun
         set_ignore(config_path, ids)
         out.write(f"ignore list now has {len(ids)} id(s) in {config_path}\n")
         return 0
+    if args.command == "ai":
+        return _ai(args, ctx, cfg, config_path, out)
     entries = load_catalog() if entries is None else entries
     providers = all_providers() if providers is None else providers
+    if args.command == "advise":
+        return _advise(args, ctx, cfg, entries, providers, out)
     if args.command == "doctor":
         return _doctor(ctx, cfg, config_path, entries, providers, out)
     if args.command == "clean":
@@ -262,6 +345,7 @@ def main(argv=None, out=None, ctx: ScanContext | None = None, entries=None, laun
         ignore=cfg.ignore,
         use_trash=cfg.use_trash,
         config_path=config_path,
+        ai_settings=AiSettings.from_config(cfg),
     )
     return 0
 

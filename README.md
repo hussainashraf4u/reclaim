@@ -141,6 +141,9 @@ The first time, run it with `--dry-run` or `--scan-only` to see what it finds.
 | `i`      | Ignore the highlighted item (saved to the config) |
 | `d`      | Browse the highlighted item's folder (read-only size browser; `enter` opens, `backspace` goes up) |
 | `h`      | Show the cleanup history                 |
+| `p`      | Show / hide the floating AI panel (starts visible on terminals 110+ columns wide) |
+| `r`      | Review the highlighted item next, jumping the AI queue (when AI is on) |
+| `,`      | AI settings                              |
 | `1`–`5`  | Switch tab: All / Safe / Regenerable / Data / Report-only |
 | `esc`    | Clear the filter / close a dialog        |
 | `q`      | Quit                                     |
@@ -258,6 +261,15 @@ Anything that needs inspection rather than a fixed path is a provider:
 
 Providers that need project knowledge (worktrees, artifacts, FVM, Node versions, Rustup, version managers) require `project_roots` in your config, because they need to know what your projects pin.
 
+## AI advisor (optional, off by default)
+
+An AI second opinion on what is safe to clean. Every item found, report-only ones included, is queued for review as the scan finds it, one at a time. Each answer lands in the Note column (`ok`, `!` or `!!`, up to two lines), the full text is in the floating panel (`p`, scrollable, streams the model live), details on `enter`, and a list in the plan. Pick an item and press `r` (or the panel's Review button) to move it to the front of the queue. After three failures in a row the queue pauses until you press `r`. It only adds notes. It cannot pick, add or run cleanups, and it can raise concern but never lower the offline checks. Item names and paths (home shortened to `~`) are sent, never file contents. Offline checks look at uncommitted git changes, missing lockfiles and recent commits.
+
+- **Enable it in the TUI:** press `,`, pick a provider and save. With Ollama, a missing model is downloaded for you (several GB, `esc` cancels) before anything is saved. The model is a dropdown filled from the provider's own list (Ollama's installed models, or Anthropic's models), with "Download another model..." for Ollama. The same settings page sets the URL and auto-review, and clears saved answers.
+- **Or from the shell:** `reclaim ai enable [--provider ollama|anthropic] [--model NAME] [--yes]`, `reclaim ai status`, `reclaim ai disable`, then `reclaim advise [--json]`.
+- Ollama must be installed and running (`brew install ollama`). Anthropic reads `ANTHROPIC_API_KEY` from the environment; the key is never written to the config.
+- No Python packages are added. Nothing is downloaded until you enable it.
+
 ## Configuration
 
 Optional. Default location: `~/.config/reclaim/config.toml`. All keys are optional:
@@ -272,6 +284,11 @@ large_dir_mb    = 1000                        # size above which unmanaged folde
 big_file_mb     = 500                         # size above which single files are reported
 duplicate_min_mb = 100                        # smallest file considered for duplicate detection
 use_trash       = false                       # move data-risk items to the Trash instead of deleting
+ai_provider     = "none"                      # "none", "ollama" (local) or "anthropic"; set from the TUI or `reclaim ai enable`
+ai_model        = "llama3.2"                  # optional; provider default if omitted
+ai_base_url     = "http://localhost:11434"    # optional
+ai_limit        = 15                          # `reclaim advise` only: review the N largest cleanable items
+ai_auto_review  = true                        # queue items for review as they are found
 ```
 
 Paths must start with `~/` or `/`. Unknown keys are an error, and a bad config prints a single error line and exits with code `2`.

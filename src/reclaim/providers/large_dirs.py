@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import os
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Iterator
 
 from reclaim.context import ScanContext
 from reclaim.model import Item, Risk

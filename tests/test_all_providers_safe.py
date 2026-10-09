@@ -1,8 +1,8 @@
 import os
 
 import pytest
-
 from conftest import FakeRun, ok
+
 from reclaim.model import RemovePath
 from reclaim.providers import all_providers, provider_roots
 from reclaim.safety import UnsafePath, check_removable, default_roots

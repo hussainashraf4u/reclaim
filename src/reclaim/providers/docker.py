@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Iterator
+from collections.abc import Iterator
 
 from reclaim.context import ScanContext
 from reclaim.model import Item, Risk, Run

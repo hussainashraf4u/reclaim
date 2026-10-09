@@ -1,6 +1,6 @@
 import os
 
-from reclaim.providers.large_dirs import LargeDirsProvider, USER_CONTENT
+from reclaim.providers.large_dirs import USER_CONTENT, LargeDirsProvider
 
 BIG = 2 * 1024**3
 

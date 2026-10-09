@@ -125,6 +125,7 @@ def test_stale_days_zero_and_negative_min_size_are_rejected(tmp_path):
 
 def test_negative_min_size_flag_is_rejected(tmp_path):
     import io
+
     from reclaim.cli import main
     from reclaim.context import ScanContext
     with pytest.raises(SystemExit):
@@ -133,6 +134,7 @@ def test_negative_min_size_flag_is_rejected(tmp_path):
 
 def test_cli_installs_the_caching_sizer_for_the_default_sizer(tmp_path):
     import io
+
     from reclaim.cli import main
     from reclaim.context import ScanContext
     from reclaim.sizing import TreeSizer

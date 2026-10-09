@@ -58,6 +58,7 @@ def test_tree_sizer_matches_dir_size(tmp_path):
 
 def test_tree_sizer_answers_descendants_without_walking_again(tmp_path, monkeypatch):
     import os as _os
+
     from reclaim import sizing
     from reclaim.sizing import TreeSizer, dir_size
     (tmp_path / "a" / "b").mkdir(parents=True)
@@ -75,6 +76,7 @@ def test_tree_sizer_answers_descendants_without_walking_again(tmp_path, monkeypa
 
 def test_tree_sizer_is_thread_safe(tmp_path):
     from concurrent.futures import ThreadPoolExecutor
+
     from reclaim.sizing import TreeSizer, dir_size
     for i in range(5):
         (tmp_path / f"d{i}" / "x").mkdir(parents=True)

@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from reclaim.audit import append, default_log_path
 from reclaim.executor import Result
@@ -7,7 +7,7 @@ from reclaim.executor import Result
 
 def test_append_writes_jsonl(tmp_path):
     log = default_log_path(tmp_path)
-    now = datetime(2026, 10, 9, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 10, 9, 12, 0, tzinfo=UTC)
     append(log, Result("a", True, ("rm -rf /x",)), freed_bytes=5, now=now)
     append(log, Result("b", False, ("boom",)), now=now)
     lines = [json.loads(l) for l in log.read_text().splitlines()]

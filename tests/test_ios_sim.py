@@ -1,6 +1,7 @@
 import json
 
 from conftest import FakeRun, ok
+
 from reclaim.model import Risk, Run
 from reclaim.providers.ios_sim import IosSimProvider
 

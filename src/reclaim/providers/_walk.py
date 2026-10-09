@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import os
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Iterable, Iterator
 
 SKIP_DIRS = frozenset({
     "node_modules", "build", "Pods", ".dart_tool", "target", "venv", ".venv", ".git", ".gradle", ".idea",

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import os
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 from reclaim.context import ScanContext
 from reclaim.model import Item, Risk, Run
@@ -83,7 +83,7 @@ class GitWorktreesProvider:
             return None
         status = ctx.run(["git", "-C", str(path), "status", "--porcelain", "--ignored"])
         known = status is not None and status.returncode == 0
-        dirty, extras = _status(status.stdout) if known else (True, [])
+        dirty, extras = _status(status.stdout) if status is not None and known else (True, [])
         ahead = ctx.run(["git", "-C", str(repo), "rev-list", "--count", f"HEAD..{block['head']}"])
         count = ahead.stdout.strip() if ahead and ahead.returncode == 0 else "?"
         branch = block["branch"] or "detached"

@@ -73,6 +73,7 @@ async def test_data_item_needs_typed_confirmation(tmp_path):
 
 async def test_overlapping_items_are_deduped_in_the_view(tmp_path):
     from pathlib import Path
+
     from reclaim.model import RemovePath
     parent = Item(id="p", label="Parent", group="G", size_bytes=100, risk=Risk.SAFE, actions=(RemovePath(Path("/h/.cache/uv")),))
     child = Item(id="c", label="Child", group="G", size_bytes=10, risk=Risk.SAFE, actions=(RemovePath(Path("/h/.cache/uv/wheels")),))

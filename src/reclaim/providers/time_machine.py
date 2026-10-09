@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterator
+from collections.abc import Iterator
 
 from reclaim.context import ScanContext
 from reclaim.model import Item, Risk

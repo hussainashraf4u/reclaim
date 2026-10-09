@@ -531,3 +531,31 @@ async def test_results_arriving_while_a_dialog_is_open_still_update_the_table(tm
         await pilot.pause(0.6)
         assert isinstance(app.screen, AiSettingsScreen)
         assert "late answer" in str(app.query_one(DataTable).get_row("b")[-1])
+
+
+def test_what_it_is_shows_in_note_detail_and_panel():
+    from reclaim.tui_ai import panel_text
+
+    advice = Advice(AdviceLevel.CAUTION, "regenerates but slow", "10 min", "llm", "Unity editor cache", "low")
+    assert advice_note(advice).startswith("! Unity editor cache: regenerates")
+    item = Item("l", "~/Unity", "Large folders", 1, Risk.DATA, report_only=True, advice=advice)
+    assert "What it is: Unity editor cache (low confidence)" in "\n".join(detail_lines(item))
+    panel = panel_text(item, AiSettings(provider="ollama"), {}, []).plain
+    assert "What it is: Unity editor cache  (low confidence)" in panel and "Stays on this machine" in panel
+    remote = AiSettings(provider="anthropic")
+    assert "sizes and extensions only" in panel_text(item, remote, {}, []).plain
+    assert "folder names" in panel_text(item, AiSettings(provider="anthropic", share_names=True), {}, []).plain
+
+
+async def test_share_names_switch_only_for_anthropic_and_saves_to_config(tmp_path):
+    app = make(tmp_path, ai_env=env())
+    async with app.run_test() as pilot:
+        screen = await open_settings(app, pilot)
+        assert not screen.query_one("#ai-share-row").display
+        screen.query_one("#ai-provider", Select).value = "anthropic"
+        await pilot.pause(0.3)
+        assert screen.query_one("#ai-share-row").display
+        screen.query_one("#ai-share", Switch).value = True
+        assert screen._current().share_names is True
+        assert AiSettings("anthropic", None, None, 15, True, True).to_keys()["ai_share_names"] is True
+        assert AiSettings("ollama", None, None, 15, True, True).to_keys()["ai_share_names"] is None

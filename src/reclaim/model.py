@@ -28,9 +28,14 @@ class Advice:
     reason: str
     rebuild: str = ""
     source: str = "heuristic"
+    what: str = ""
+    confidence: str = ""
 
     def to_json(self) -> dict:
-        return {"level": self.level.value, "reason": self.reason, "rebuild": self.rebuild, "source": self.source}
+        return {
+            "level": self.level.value, "reason": self.reason, "rebuild": self.rebuild, "source": self.source,
+            "what": self.what, "confidence": self.confidence,
+        }
 
 
 @dataclass(frozen=True)

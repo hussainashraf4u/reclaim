@@ -28,13 +28,14 @@ class Config:
     ai_base_url: str | None = None
     ai_limit: int = 15
     ai_auto_review: bool = True
+    ai_share_names: bool = False
 
 
 def default_config_path(home: Path) -> Path:
     return home / ".config" / "reclaim" / "config.toml"
 
 
-_KEYS = frozenset({"project_roots", "extra_allowlist", "ignore", "min_size_mb", "stale_days", "large_dir_mb", "use_trash", "big_file_mb", "duplicate_min_mb", "ai_provider", "ai_model", "ai_base_url", "ai_limit", "ai_auto_review"})
+_KEYS = frozenset({"project_roots", "extra_allowlist", "ignore", "min_size_mb", "stale_days", "large_dir_mb", "use_trash", "big_file_mb", "duplicate_min_mb", "ai_provider", "ai_model", "ai_base_url", "ai_limit", "ai_auto_review", "ai_share_names"})
 _SENSITIVE = frozenset({".ssh", ".gnupg", "Keychains"})
 
 
@@ -108,7 +109,11 @@ def load_config(path: Path, home: Path) -> Config:
     ai_auto_review = data.get("ai_auto_review", True)
     if not isinstance(ai_auto_review, bool):
         raise ConfigError(f"{path}: 'ai_auto_review' must be true or false")
+    ai_share_names = data.get("ai_share_names", False)
+    if not isinstance(ai_share_names, bool):
+        raise ConfigError(f"{path}: 'ai_share_names' must be true or false")
     return Config(
+        ai_share_names=ai_share_names,
         ai_limit=_int(data, "ai_limit", 15, path, 1),
         ai_auto_review=ai_auto_review,
         ai_provider=ai["ai_provider"] or "none",

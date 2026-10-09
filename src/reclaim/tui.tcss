@@ -77,7 +77,8 @@ DataTable {
     margin-top: 1;
 }
 
-#ai-auto-row {
+#ai-auto-row,
+#ai-share-row {
     height: 3;
     align-horizontal: left;
 }

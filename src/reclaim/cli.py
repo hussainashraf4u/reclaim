@@ -242,7 +242,8 @@ def _advise(args, ctx: ScanContext, cfg: Config, entries, providers, out) -> int
         return EXIT_CONFIG
     result = scan_all(ctx, entries, providers, ignore=cfg.ignore)
     cache = None if args.no_cache else setup.default_cache_path(ctx.home)
-    res = advise(result.items, ctx, provider, cache, cfg.ai_limit if args.limit is None else args.limit)
+    res = advise(result.items, ctx, provider, cache, cfg.ai_limit if args.limit is None else args.limit,
+                 share_names=cfg.ai_share_names)
     reviewed = [i for i in result.items if i.advice is not None]
     if getattr(args, "json", False):
         out.write(json.dumps({"version": 1, "provider": cfg.ai_provider, "error": str(res.error) if res.error else None,

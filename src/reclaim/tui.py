@@ -281,7 +281,8 @@ def advice_note(advice: Advice | None) -> str:
     """Everything the review said, on one line, or '' when there is no review."""
     if advice is None:
         return ""
-    text = f"{_ADVICE_MARK[advice.level]} {advice.reason}".rstrip()
+    body = f"{advice.what}: {advice.reason}" if advice.what and advice.reason else advice.what or advice.reason
+    text = f"{_ADVICE_MARK[advice.level]} {body}".rstrip()
     return f"{text} (rebuild: {advice.rebuild})" if advice.rebuild else text
 
 
@@ -302,6 +303,9 @@ def detail_lines(item: Item) -> list[str]:
     if item.why:
         lines.append(f"Why: {item.why}")
     if item.advice is not None:
+        if item.advice.what:
+            confidence = f" ({item.advice.confidence} confidence)" if item.advice.confidence else ""
+            lines.append(f"What it is: {item.advice.what}{confidence}")
         lines.append(f"AI review: {item.advice.level.value} - {item.advice.reason}")
         if item.advice.rebuild:
             lines.append(f"Rebuild cost: {item.advice.rebuild}")
@@ -879,7 +883,7 @@ def run_app(
             provider = build_provider(settings.provider, settings.model, settings.base_url, ctx.env)
         except ValueError as exc:
             return Outcome(None, str(exc))
-        result = advise_one(item, ctx, provider, ai_cache_path, on_event, use_cache=not fresh)
+        result = advise_one(item, ctx, provider, ai_cache_path, on_event, use_cache=not fresh, share_names=settings.share_names)
         return Outcome(result.advice.get(item.id), str(result.error) if result.error else None)
 
     cache_path = scancache.default_cache_path(ctx.home)

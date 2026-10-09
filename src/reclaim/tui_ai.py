@@ -70,6 +70,9 @@ class AiSettingsScreen(ModalScreen["AiSettings | None"]):
                 yield Input("", placeholder="model name to download, e.g. qwen2.5:7b", id="ai-model-custom")
                 yield Static("Server URL (blank = default; enter reloads models)")
                 yield Input(s.base_url or "", placeholder=_URL_HINT[s.provider], id="ai-url")
+                with Horizontal(id="ai-share-row"):
+                    yield Switch(s.share_names, id="ai-share")
+                    yield Static(" Send file and folder names to Anthropic")
                 with Horizontal(id="ai-auto-row"):
                     yield Switch(s.auto_review, id="ai-auto")
                     yield Static(" Review items automatically as they are found")
@@ -84,6 +87,7 @@ class AiSettingsScreen(ModalScreen["AiSettings | None"]):
 
     def on_mount(self) -> None:
         self.query_one("#ai-model-custom", Input).display = False
+        self.query_one("#ai-share-row").display = self.settings.provider == "anthropic"
         if self.settings.enabled:
             self._run_check()
 
@@ -111,6 +115,7 @@ class AiSettingsScreen(ModalScreen["AiSettings | None"]):
             base_url=self.query_one("#ai-url", Input).value.strip() or None,
             limit=self.settings.limit,
             auto_review=self.query_one("#ai-auto", Switch).value,
+            share_names=self.query_one("#ai-share", Switch).value,
         )
 
     def _say(self, text: str, error: bool = False, ok: bool = False) -> None:
@@ -145,6 +150,7 @@ class AiSettingsScreen(ModalScreen["AiSettings | None"]):
         if provider == self._provider:
             return
         self._provider = provider
+        self.query_one("#ai-share-row").display = provider == "anthropic"
         self.query_one("#ai-url", Input).placeholder = _URL_HINT[provider]
         self.query_one("#ai-pull", Static).update(Text(""))
         self._fill_models(provider, [], None)
@@ -294,6 +300,12 @@ _STATE_TEXT = {
 }
 
 
+def _privacy_line(settings: AiSettings) -> str:
+    if settings.provider == "anthropic":
+        return "Sent to Anthropic: " + ("sizes, extensions and file or folder names" if settings.share_names else "sizes and extensions only")
+    return "Stays on this machine"
+
+
 def panel_text(
     item: Item | None,
     settings: AiSettings,
@@ -311,6 +323,7 @@ def panel_text(
     else:
         out.append(f"{settings.provider}", style="bold green")
         out.append(f"  {settings.model or 'default model'}\n", style="dim")
+        out.append(_privacy_line(settings) + "\n", style="dim")
         busy = counts.get("running", 0) + counts.get("queued", 0)
         out.append(
             f"{counts.get('running', 0)} reviewing  {counts.get('queued', 0)} queued  "
@@ -326,6 +339,10 @@ def panel_text(
         out.append(f"{item.label}\n", style="bold")
         advice = item.advice
         if advice is not None:
+            if advice.what:
+                out.append("What it is: ", style="bold")
+                out.append(advice.what)
+                out.append(f"  ({advice.confidence} confidence)\n" if advice.confidence else "\n", style="dim")
             out.append(f"{advice.level.value}", style=_LEVEL_STYLE[advice.level.value])
             out.append(f"  ({advice.source})\n", style="dim")
             out.append(f"{advice.reason}\n")

@@ -1,7 +1,17 @@
 [project]
 name = "reclaim"
-version = "0.1.0"
-description = "Interactive TUI that finds and safely cleans reclaimable dev-machine data on macOS"
+version = "0.2.0"
+description = "Interactive TUI that finds and safely cleans reclaimable dev-machine data (macOS, Linux)"
+readme = "README.md"
+license = { text = "MIT" }
+classifiers = [
+  "Environment :: Console",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Topic :: System :: Systems Administration",
+]
 requires-python = ">=3.11"
 dependencies = ["textual>=0.86"]
 
@@ -9,7 +19,7 @@ dependencies = ["textual>=0.86"]
 reclaim = "reclaim.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "pytest-asyncio>=0.24"]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.6", "mypy>=1.10"]
 
 [build-system]
 requires = ["hatchling"]
@@ -22,3 +32,17 @@ packages = ["src/reclaim"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 140
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501", "E731", "E741", "B008", "B905", "UP042"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+check_untyped_defs = true

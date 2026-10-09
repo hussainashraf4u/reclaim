@@ -1,6 +1,6 @@
 # reclaim
 
-**Find and safely clean reclaimable dev-machine data on macOS.**
+**Find and safely clean reclaimable dev-machine data on macOS and Linux.**
 
 `reclaim` is an interactive terminal app (TUI) that scans your Mac for the things developers accumulate and forget about: package-manager caches, build output, Xcode and Android leftovers, Docker junk, old Node and Flutter versions, simulators, local LLM models. It ranks them by size, explains each one, and cleans only the items you pick.
 
@@ -11,7 +11,7 @@
    ...
 ```
 
-> **Status:** early (`0.1.0`), macOS only. Contributions are welcome, see [Contributing](#contributing).
+> **Status:** early (`0.2.0`). macOS is the primary target; Linux is supported for the XDG cache rules and the cross-platform providers (beta). Contributions are welcome, see [Contributing](#contributing).
 
 ## Table of contents
 
@@ -38,7 +38,7 @@ Generic disk cleaners know about system caches but not about `DerivedData`, unpi
 
 ## Install
 
-**Requirements:** macOS, Python 3.11+. The only runtime dependency is [Textual](https://textual.textualize.io/).
+**Requirements:** macOS or Linux, Python 3.11+. The only runtime dependency is [Textual](https://textual.textualize.io/).
 
 ### From source (recommended while the project is young)
 
@@ -70,6 +70,15 @@ reclaim --scan-only --json    # same, as JSON (scriptable)
 reclaim --min-size-mb 200     # hide items smaller than 200 MB (default 50)
 reclaim --config PATH         # use another config file
 reclaim --version
+
+reclaim clean                 # print the plan for all safe items (nothing executes)
+reclaim clean --yes           # ...and execute it (cron / launchd friendly)
+reclaim clean --risk regenerable --older-than 60 --yes
+reclaim clean --ids homebrew-cache npm-cache --yes
+reclaim clean --ids my-volume --allow-data --yes   # data items only by explicit id
+reclaim history               # what past runs freed (--json, --limit N)
+reclaim doctor                # why is a scanner empty? shows each provider's result
+reclaim ignore ID [ID...]     # hide items for good (writes the config); unignore reverses it
 ```
 
 The first time, run it with `--dry-run` or `--scan-only` to see what it finds.
@@ -82,6 +91,10 @@ The first time, run it with `--dry-run` or `--scan-only` to see what it finds.
 | `a`      | Select everything marked `safe`          |
 | `c`      | Show the plan (exact commands) and confirm |
 | `/`      | Filter the list by text                  |
+| `s`      | Cycle sort: size / age / name / risk     |
+| `i`      | Ignore the highlighted item (saved to the config) |
+| `d`      | Browse the highlighted item's folder (read-only size browser; `enter` opens, `backspace` goes up) |
+| `h`      | Show the cleanup history                 |
 | `1`–`5`  | Switch tab: All / Safe / Regenerable / Data / Report-only |
 | `esc`    | Clear the filter / close a dialog        |
 | `q`      | Quit                                     |
@@ -93,6 +106,18 @@ The first time, run it with `--dry-run` or `--scan-only` to see what it finds.
 | `safe`        | Pure cache. Gets rebuilt on demand with no loss.                        | Plan screen                 |
 | `regenerable` | Can be recreated, but costs time or a download (`node_modules`, SDKs).  | Plan screen                 |
 | `data`        | May hold something you want (volumes, models, environments).            | Type the item id to confirm |
+
+### Non-interactive cleaning
+
+`reclaim clean` runs the same safety checks as the TUI. Without `--yes` it only prints the plan. With `--yes`:
+
+- the default selection is every executable item with risk `safe`; `--risk regenerable` adds regenerable ones;
+- `--older-than DAYS` keeps only items that report an age (project artifacts);
+- `data` items are never part of a bulk selection; name them with `--ids` **and** `--allow-data`;
+- the audit log is written, and the freed space is measured and printed;
+- the exit code is `3` if any item failed, `2` for bad arguments or config.
+
+Example weekly job (launchd or cron): `reclaim clean --risk regenerable --older-than 60 --yes`.
 
 ### JSON output
 
@@ -126,7 +151,12 @@ The first time, run it with `--dry-run` or `--scan-only` to see what it finds.
 | Code | Meaning                                                   |
 | ---- | --------------------------------------------------------- |
 | `0`  | Success                                                   |
-| `2`  | Invalid config file (one error line is printed to stderr) |
+| `2`  | Invalid config file or invalid `clean` arguments (one error line on stderr) |
+| `3`  | `reclaim clean --yes` finished but at least one item failed |
+
+### Scan history and changes
+
+`--scan-only` and the TUI remember each item's size in `~/.cache/reclaim/last_scan.json`, so output can show growth ("+1.2 GB since last scan"). `reclaim history` reads the audit log and prints what each run freed plus a lifetime total.
 
 ## Safety model
 
@@ -142,8 +172,11 @@ Safety is the core of this project, so it is documented in full. Please read thi
 5. **Busy-process check.** Items can declare processes that must not be running (for example a tool whose cache is in use). If one is running, the item is skipped with a message.
 6. **Type-to-confirm for `data`.** You must type the id of every `data` item in the plan.
 7. **Dry run.** `--dry-run` never executes, even after you confirm.
+   **Trash for data.** With `use_trash = true` in the config, `data` items are moved to `~/.Trash` instead of deleted, so they can be put back. The move goes through the same allowlist check.
 8. **Audit log.** Every run is appended to `~/.local/state/reclaim/log.jsonl` with timestamp, item, success, output and bytes freed.
 9. **Config can't widen the blast radius.** `project_roots` and `extra_allowlist` are rejected if they are `/`, your home, an ancestor, contain `..`, sit under `~/Library` (project roots), or point at `.ssh`, `.gnupg` or `Keychains`. `extra_allowlist` entries must be at least two levels below home.
+
+10. **Plugin roots are restricted.** Roots contributed by third-party providers (see [Plugins](#plugins)) must be specific folders at least two levels below home (three under `~/Library`) and never `.ssh`, `.gnupg` or `Keychains`; others are dropped.
 
 There is a test that runs every provider against a fake home and asserts that **every** remove action it emits passes the guard ([`tests/test_all_providers_safe.py`](tests/test_all_providers_safe.py)). New providers must keep it green.
 
@@ -170,8 +203,14 @@ Anything that needs inspection rather than a fixed path is a provider:
 | Conda               | Environments and package cache                                                                                   |
 | Time Machine        | Local snapshots (**report only**)                                                                                |
 | Large directories   | Bounded scan for big folders no rule covers (**report only**)                                                    |
+| Rustup              | Toolchains that are neither the default, an override, nor named by a `rust-toolchain` file                       |
+| Version managers    | pyenv, rbenv, asdf, mise and SDKMAN versions that are neither global nor pinned (`.python-version`, `.tool-versions`, `.sdkmanrc`, ...) |
+| Homebrew            | Unused dependencies (`brew autoremove`)                                                                          |
+| VM disks            | Colima, Lima, OrbStack and Podman machine disks (**report only**)                                                |
+| Big files           | Single large files in Documents, Desktop, Movies, Downloads, Music, Pictures (**report only**)                   |
+| Duplicates          | Identical large files, sized by the redundant copies (**report only**)                                           |
 
-Providers that need project knowledge (worktrees, artifacts, FVM, Node versions) require `project_roots` in your config, because they need to know what your projects pin.
+Providers that need project knowledge (worktrees, artifacts, FVM, Node versions, Rustup, version managers) require `project_roots` in your config, because they need to know what your projects pin.
 
 ## Configuration
 
@@ -184,9 +223,28 @@ ignore          = ["trash"]                   # item ids to hide
 min_size_mb     = 50                          # hide items smaller than this
 stale_days      = 30                          # age before a project artifact counts as stale
 large_dir_mb    = 1000                        # size above which unmanaged folders are listed
+big_file_mb     = 500                         # size above which single files are reported
+duplicate_min_mb = 100                        # smallest file considered for duplicate detection
+use_trash       = false                       # move data-risk items to the Trash instead of deleting
 ```
 
 Paths must start with `~/` or `/`. Unknown keys are an error, and a bad config prints a single error line and exits with code `2`.
+
+## Plugins
+
+Third-party packages can add providers without a PR. Expose a zero-argument callable (usually a class) in the `reclaim.providers` entry point group:
+
+```toml
+# the plugin's pyproject.toml
+[project.entry-points."reclaim.providers"]
+mytool = "reclaim_mytool:MyToolProvider"
+```
+
+The provider needs a `name` and `scan(ctx) -> Iterable[Item]`, and follows the same rules as built-in providers (read-only scans, use only `ctx`). A plugin that fails to load is skipped with a warning. Its `roots()` are filtered as described under the safety model.
+
+## Linux
+
+The XDG cache rules in `catalog_data/linux.toml` and the cross-platform providers (project artifacts, version managers, Rustup, Docker, Ollama, big files, duplicates, ...) work on Linux. macOS-only scanners (Xcode, simulators, Time Machine) simply report nothing there. Linux is a beta target: expect gaps in distro-specific caches, and please open issues.
 
 ## Project layout
 
@@ -195,7 +253,9 @@ src/reclaim/
 ├── cli.py            argument parsing, wiring, --scan-only output
 ├── tui.py            Textual app: tabs, table, plan / run / detail screens
 ├── tui.tcss          Textual stylesheet (bundled into the executable)
-├── scan.py           runs catalog + providers, collects errors
+├── scan.py           runs catalog + providers, collects errors, reports progress
+├── runner.py         runs a list of items, audits each, measures freed space (TUI and `clean`)
+├── scancache.py      remembers sizes between scans to show growth
 ├── catalog.py        loads and validates catalog_data/*.toml
 ├── catalog_data/     declarative cache rules (TOML)
 ├── providers/        logic-driven scanners (docker, android, fvm, ...)
@@ -208,7 +268,7 @@ src/reclaim/
 ├── sizing.py         fast directory sizing
 ├── selection.py      selection state and plan text
 └── units.py          size parsing and formatting
-tests/                pytest suite (268 tests)
+tests/                pytest suite (335 tests)
 scripts/              build_executable.sh
 ```
 
@@ -271,6 +331,13 @@ Rules:
 - Add or update tests for every behaviour change; run `pytest` before opening a PR.
 - Open an issue first for large changes.
 
+## Releases and distribution
+
+- `.github/workflows/ci.yml` runs the tests on macOS and Linux (Python 3.11 and 3.13), plus ruff, mypy and a catalog/allowlist job.
+- `.github/workflows/release.yml` builds the macOS binary, publishes to PyPI via trusted publishing, and attaches the zip to a GitHub release when you push a `v*` tag. Set up the `pypi` environment and trusted publisher on PyPI once.
+- `packaging/reclaim.rb` is a Homebrew formula template for your own tap.
+- `packaging/NOTARIZE.md` lists the manual signing and notarization steps (needs an Apple Developer ID).
+
 ## Building a standalone executable
 
 ```bash
@@ -308,4 +375,4 @@ Verify a download with `cd dist && shasum -a 256 -c reclaim-*.zip.sha256`.
 
 ## License
 
-No license has been chosen yet. Add a `LICENSE` file (for example MIT or Apache-2.0) before accepting outside contributions, then update this section.
+MIT, see [`LICENSE`](LICENSE).

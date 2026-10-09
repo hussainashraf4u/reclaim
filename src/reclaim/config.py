@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
+import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,13 +20,16 @@ class Config:
     min_size_mb: int = 50
     stale_days: int = 30
     large_dir_mb: int = 1000
+    big_file_mb: int = 500
+    duplicate_min_mb: int = 100
+    use_trash: bool = False
 
 
 def default_config_path(home: Path) -> Path:
     return home / ".config" / "reclaim" / "config.toml"
 
 
-_KEYS = frozenset({"project_roots", "extra_allowlist", "ignore", "min_size_mb", "stale_days", "large_dir_mb"})
+_KEYS = frozenset({"project_roots", "extra_allowlist", "ignore", "min_size_mb", "stale_days", "large_dir_mb", "use_trash", "big_file_mb", "duplicate_min_mb"})
 _SENSITIVE = frozenset({".ssh", ".gnupg", "Keychains"})
 
 
@@ -84,6 +89,9 @@ def load_config(path: Path, home: Path) -> Config:
     ignore = data.get("ignore", [])
     if not isinstance(ignore, list) or not all(isinstance(v, str) for v in ignore):
         raise ConfigError(f"{path}: 'ignore' must be a list of strings")
+    use_trash = data.get("use_trash", False)
+    if not isinstance(use_trash, bool):
+        raise ConfigError(f"{path}: 'use_trash' must be true or false")
     return Config(
         project_roots=_paths(data, "project_roots", home, path),
         extra_allowlist=_paths(data, "extra_allowlist", home, path),
@@ -91,4 +99,22 @@ def load_config(path: Path, home: Path) -> Config:
         min_size_mb=_int(data, "min_size_mb", 50, path, 0),
         stale_days=_int(data, "stale_days", 30, path, 1),
         large_dir_mb=_int(data, "large_dir_mb", 1000, path, 1),
+        big_file_mb=_int(data, "big_file_mb", 500, path, 1),
+        duplicate_min_mb=_int(data, "duplicate_min_mb", 100, path, 1),
+        use_trash=use_trash,
     )
+
+
+_IGNORE_RE = re.compile(r"^ignore\s*=\s*\[[^\]]*\]", re.MULTILINE)
+
+
+def set_ignore(path: Path, ids: set[str]) -> None:
+    """Rewrite the 'ignore' key in the config file, creating the file if needed."""
+    line = "ignore = [" + ", ".join(json.dumps(i) for i in sorted(ids)) + "]"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    if _IGNORE_RE.search(text):
+        text = _IGNORE_RE.sub(lambda _: line, text, count=1)
+    else:
+        text = (text.rstrip("\n") + "\n" if text.strip() else "") + line + "\n"
+    path.write_text(text, encoding="utf-8")

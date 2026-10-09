@@ -4,12 +4,12 @@ import shlex
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 from reclaim.context import process_running
-from reclaim.model import Action, Item, RemovePath
+from reclaim.model import Action, Item, RemovePath, Risk
 from reclaim.safety import UnsafePath, check_removable
 
 
@@ -40,6 +40,19 @@ def _rmtree(path: Path) -> list[str]:
     return errors
 
 
+def _trash_target(trash_dir: Path, source: Path) -> Path:
+    target = trash_dir / source.name
+    n = 1
+    while target.exists() or target.is_symlink():
+        n += 1
+        target = trash_dir / f"{source.name} {n}"
+    return target
+
+
+def describe_trash(action: RemovePath, trash_dir: Path) -> str:
+    return f"mv {shlex.quote(str(action.path))} {shlex.quote(str(trash_dir))}/"
+
+
 def run_item(
     item: Item,
     roots: list[Path],
@@ -47,11 +60,13 @@ def run_item(
     dry_run: bool = False,
     runner=subprocess.run,
     is_running: Callable[[str], bool] = process_running,
+    trash_dir: Path | None = None,
 ) -> Result:
     if not item.executable:
         raise NotExecutable(item.id)
     log: list[str] = []
     measured = True
+    trash = trash_dir if item.risk is Risk.DATA else None
     for name in item.busy:
         if is_running(name):
             return Result(item.id, False, (f"{name} is running",))
@@ -59,8 +74,16 @@ def run_item(
         try:
             if isinstance(action, RemovePath):
                 real = check_removable(action.path, roots, home)
-                log.append(describe(action))
+                if trash is not None:
+                    log.append(describe_trash(action, trash))
+                    measured = False
+                else:
+                    log.append(describe(action))
                 if dry_run:
+                    continue
+                if trash is not None:
+                    trash.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(action.path), str(_trash_target(trash, action.path)))
                     continue
                 existed = action.path.is_symlink() or real.exists()
                 measured = measured and existed

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Iterable, Protocol
+from typing import Protocol
 
 from reclaim.catalog import CatalogEntry, entry_to_items
 from reclaim.context import ScanContext
@@ -74,6 +75,10 @@ def drop_covered(items: list[Item]) -> list[Item]:
     return out
 
 
+def _scan_provider(provider: Provider, ctx: ScanContext) -> list[Item]:
+    return list(provider.scan(ctx))
+
+
 def scan_all(
     ctx: ScanContext,
     entries: Iterable[CatalogEntry],
@@ -81,6 +86,7 @@ def scan_all(
     on_items: Callable[[list[Item]], None] | None = None,
     max_workers: int = 8,
     ignore: frozenset[str] = frozenset(),
+    on_progress: Callable[[int, int, str], None] | None = None,
 ) -> ScanResult:
     jobs: dict = {}
     result = ScanResult()
@@ -88,8 +94,12 @@ def scan_all(
         for entry in entries:
             jobs[pool.submit(entry_to_items, entry, ctx)] = entry.id
         for provider in providers:
-            jobs[pool.submit(lambda p=provider: list(p.scan(ctx)))] = provider.name
+            jobs[pool.submit(_scan_provider, provider, ctx)] = provider.name
+        total, finished = len(jobs), 0
         for future in as_completed(jobs):
+            finished += 1
+            if on_progress:
+                on_progress(finished, total, jobs[future])
             try:
                 batch = list(future.result())
             except Exception as exc:

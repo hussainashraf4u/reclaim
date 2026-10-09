@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from reclaim.executor import run_item
 from reclaim.model import Item, Risk
@@ -86,13 +86,13 @@ class Selection:
     def data_ids(self) -> list[str]:
         return [i.id for i in self.selected if i.risk is Risk.DATA]
 
-    def plan_lines(self, roots: list[Path], home: Path) -> list[str]:
+    def plan_lines(self, roots: list[Path], home: Path, trash_dir: Path | None = None) -> list[str]:
         lines: list[str] = []
         expected = 0
         for item in self.selected:
             tag = f"  id: {item.id}" if item.risk is Risk.DATA else ""
             lines.append(f"[{item.risk.value}] {item.label} ({human(item.size_bytes)}){tag}")
-            result = run_item(item, roots, home, dry_run=True)
+            result = run_item(item, roots, home, dry_run=True, trash_dir=trash_dir)
             for entry in result.log:
                 lines.append(f"    {entry}")
             if result.ok:

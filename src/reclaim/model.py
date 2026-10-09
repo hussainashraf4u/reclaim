@@ -37,13 +37,15 @@ class Item:
     report_only: bool = False
     busy: tuple[str, ...] = ()
     path: Path | None = None
+    age_days: int | None = None
+    delta_bytes: int | None = None
 
     @property
     def executable(self) -> bool:
         return bool(self.actions) and not self.report_only and self.disabled_reason is None
 
     def to_json(self) -> dict:
-        actions = []
+        actions: list[dict] = []
         for a in self.actions:
             if isinstance(a, RemovePath):
                 actions.append({"type": "remove", "path": str(a.path)})
@@ -61,4 +63,6 @@ class Item:
             "report_only": self.report_only,
             "executable": self.executable,
             "path": str(self.path) if self.path else None,
+            "age_days": self.age_days,
+            "delta_bytes": self.delta_bytes,
         }

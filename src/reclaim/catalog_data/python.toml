@@ -1,0 +1,49 @@
+[[item]]
+id = "uv-cache"
+label = "uv cache"
+group = "Python"
+path = "~/.cache/uv"
+risk = "safe"
+why = "Wheels and built sources; the largest single cache on many machines."
+clean = { run = ["uv", "cache", "clean"] }
+needs = "uv"
+
+[[item]]
+id = "pip-cache"
+label = "pip cache"
+group = "Python"
+path = "~/Library/Caches/pip"
+risk = "safe"
+why = "Downloaded wheels."
+
+[[item]]
+id = "poetry-cache"
+label = "Poetry cache"
+group = "Python"
+path = "~/Library/Caches/pypoetry"
+risk = "safe"
+why = "Poetry download and virtualenv cache."
+
+[[item]]
+id = "pre-commit"
+label = "pre-commit environments"
+group = "Python"
+path = "~/.cache/pre-commit"
+risk = "safe"
+why = "Hook environments; rebuilt on next run."
+
+[[item]]
+id = "huggingface"
+label = "Hugging Face models"
+group = "Python"
+path = "~/.cache/huggingface"
+risk = "regenerable"
+why = "Downloaded models and datasets; often tens of GB."
+
+[[item]]
+id = "torch"
+label = "PyTorch hub cache"
+group = "Python"
+path = "~/.cache/torch"
+risk = "regenerable"
+why = "Downloaded pretrained weights."

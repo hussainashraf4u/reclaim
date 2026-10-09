@@ -1,0 +1,64 @@
+ModalScreen {
+    align: center middle;
+}
+
+#dialog {
+    width: 80%;
+    max-width: 110;
+    height: auto;
+    max-height: 85%;
+    padding: 1 2;
+    border: thick $primary;
+    background: $surface;
+}
+
+#dialog .title {
+    text-style: bold;
+}
+
+#dialog VerticalScroll {
+    height: auto;
+    max-height: 20;
+    margin: 1 0;
+}
+
+#dialog Horizontal {
+    height: auto;
+    align-horizontal: right;
+}
+
+#dialog Button {
+    margin-left: 2;
+}
+
+#dialog Input {
+    margin-bottom: 1;
+}
+
+#progress {
+    margin-top: 1;
+}
+
+#log {
+    height: 8;
+    margin: 0 0 1 0;
+    border: round $primary-darken-2;
+}
+
+#scanning {
+    height: 1;
+    color: $accent;
+}
+
+#status {
+    height: auto;
+    padding: 0 1;
+}
+
+Tabs {
+    margin-bottom: 1;
+}
+
+DataTable {
+    height: 1fr;
+}

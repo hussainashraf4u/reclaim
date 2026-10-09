@@ -1,0 +1,43 @@
+[[item]]
+id = "cargo-registry"
+label = "Cargo registry"
+group = "Rust, Go and Java"
+path = "~/.cargo/registry"
+risk = "regenerable"
+why = "Downloaded crates; re-fetched on next build."
+
+[[item]]
+id = "cargo-git"
+label = "Cargo git checkouts"
+group = "Rust, Go and Java"
+path = "~/.cargo/git"
+risk = "regenerable"
+why = "Git dependencies; re-fetched on next build."
+
+[[item]]
+id = "go-build"
+label = "Go build cache"
+group = "Rust, Go and Java"
+path = "~/Library/Caches/go-build"
+risk = "safe"
+why = "Compiled package cache."
+clean = { run = ["go", "clean", "-cache"] }
+needs = "go"
+
+[[item]]
+id = "go-mod"
+label = "Go module cache"
+group = "Rust, Go and Java"
+path = "~/go/pkg/mod"
+risk = "regenerable"
+why = "Downloaded modules; read-only files, so only 'go clean' removes them."
+clean = { run = ["go", "clean", "-modcache"] }
+needs = "go"
+
+[[item]]
+id = "maven"
+label = "Maven repository"
+group = "Rust, Go and Java"
+path = "~/.m2/repository"
+risk = "data"
+why = "Downloaded artifacts plus anything installed locally with 'mvn install', which cannot be re-fetched."

@@ -1,0 +1,75 @@
+[[item]]
+id = "npm-cache"
+label = "npm cache"
+group = "JavaScript"
+path = "~/.npm/_cacache"
+risk = "safe"
+why = "Downloaded tarballs; re-fetched on demand."
+clean = { run = ["npm", "cache", "clean", "--force"] }
+needs = "npm"
+
+[[item]]
+id = "npm-logs"
+label = "npm logs"
+group = "JavaScript"
+path = "~/.npm/_logs"
+risk = "safe"
+why = "Old npm debug logs."
+
+[[item]]
+id = "pnpm-store"
+label = "pnpm store"
+group = "JavaScript"
+path = "~/Library/pnpm/store"
+risk = "safe"
+why = "Content-addressable package store; re-fetched on demand."
+clean = { run = ["pnpm", "store", "prune"] }
+needs = "pnpm"
+
+[[item]]
+id = "yarn-cache"
+label = "Yarn cache"
+group = "JavaScript"
+path = "~/Library/Caches/Yarn"
+risk = "safe"
+why = "Yarn v1 package cache."
+
+[[item]]
+id = "bun-cache"
+label = "Bun install cache"
+group = "JavaScript"
+path = "~/.bun/install/cache"
+risk = "safe"
+why = "Bun package cache; re-fetched on demand."
+
+[[item]]
+id = "node-gyp"
+label = "node-gyp headers"
+group = "JavaScript"
+path = "~/.cache/node-gyp"
+risk = "safe"
+why = "Node headers for native builds."
+
+[[item]]
+id = "playwright"
+label = "Playwright browsers"
+group = "JavaScript"
+path = "~/Library/Caches/ms-playwright"
+risk = "regenerable"
+why = "Downloaded browser builds; reinstall with 'npx playwright install'."
+
+[[item]]
+id = "puppeteer"
+label = "Puppeteer browsers"
+group = "JavaScript"
+path = "~/.cache/puppeteer"
+risk = "regenerable"
+why = "Downloaded Chrome builds."
+
+[[item]]
+id = "cypress"
+label = "Cypress binary"
+group = "JavaScript"
+path = "~/Library/Caches/Cypress"
+risk = "regenerable"
+why = "Cypress app binaries; re-downloaded on next install."

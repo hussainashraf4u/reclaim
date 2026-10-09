@@ -1,0 +1,89 @@
+[[item]]
+id = "pub-cache-hosted"
+label = "Dart pub cache (hosted)"
+group = "Flutter and Android"
+path = "~/.pub-cache/hosted"
+risk = "regenerable"
+why = "Hosted packages; next 'pub get' downloads them again. Globally activated tools in bin/ are kept."
+
+[[item]]
+id = "pub-cache-git"
+label = "Dart pub cache (git)"
+group = "Flutter and Android"
+path = "~/.pub-cache/git"
+risk = "regenerable"
+why = "Git dependencies; re-cloned on next 'pub get'."
+
+[[item]]
+id = "gradle-caches"
+label = "Gradle caches"
+group = "Flutter and Android"
+path = "~/.gradle/caches"
+risk = "regenerable"
+why = "Dependency and build caches; first build after removal is slow."
+
+[[item]]
+id = "gradle-dists"
+label = "Gradle wrapper distributions"
+group = "Flutter and Android"
+path = "~/.gradle/wrapper/dists"
+risk = "regenerable"
+why = "Downloaded Gradle versions; the wrapper fetches the one a project needs."
+
+[[item]]
+id = "cocoapods"
+label = "CocoaPods cache"
+group = "Xcode"
+path = "~/Library/Caches/CocoaPods"
+risk = "safe"
+why = "Downloaded pod sources."
+
+[[item]]
+id = "xcode-derived"
+label = "Xcode DerivedData"
+group = "Xcode"
+glob = "~/Library/Developer/Xcode/DerivedData/*"
+risk = "safe"
+why = "Build products and indexes; rebuilt on demand."
+busy = ["Xcode"]
+
+[[item]]
+id = "xcode-archives"
+label = "Xcode Archives"
+group = "Xcode"
+glob = "~/Library/Developer/Xcode/Archives/*"
+risk = "data"
+why = "App archives; symbols for released builds may live here."
+busy = ["Xcode"]
+
+[[item]]
+id = "ios-devicesupport"
+label = "iOS DeviceSupport"
+group = "Xcode"
+glob = "~/Library/Developer/Xcode/iOS DeviceSupport/*"
+risk = "regenerable"
+why = "Symbols copied from connected devices; re-created when you plug one in."
+
+[[item]]
+id = "coresim-caches"
+label = "CoreSimulator caches"
+group = "Xcode"
+path = "~/Library/Developer/CoreSimulator/Caches"
+risk = "safe"
+why = "Simulator dyld caches."
+
+[[item]]
+id = "fastlane"
+label = "fastlane cache"
+group = "Xcode"
+path = "~/.fastlane"
+risk = "regenerable"
+why = "fastlane caches and spaceship session cookies; removing it forces an App Store Connect re-login with 2FA."
+
+[[item]]
+id = "fvm-cache"
+label = "FVM git cache"
+group = "Flutter and Android"
+path = "~/fvm/cache.git"
+risk = "regenerable"
+why = "Mirror of the Flutter repository used by fvm; re-cloned on next 'fvm install'."

@@ -1,0 +1,34 @@
+[[item]]
+id = "homebrew-cache"
+label = "Homebrew downloads"
+group = "System"
+path = "~/Library/Caches/Homebrew"
+risk = "safe"
+why = "Old bottles and downloads."
+clean = { run = ["brew", "cleanup", "-s"] }
+needs = "brew"
+
+[[item]]
+id = "user-logs"
+label = "User logs"
+group = "System"
+glob = "~/Library/Logs/*"
+risk = "safe"
+why = "App logs and crash reports."
+
+[[item]]
+id = "trash"
+label = "Trash"
+group = "System"
+glob = "~/.Trash/*"
+risk = "data"
+why = "Files you deleted but did not empty; confirm before removing."
+
+[[item]]
+id = "claude-vm"
+label = "Claude app VM bundle"
+group = "System"
+path = "~/Library/Application Support/Claude/vm_bundles/claudevm.bundle"
+risk = "regenerable"
+why = "Downloaded again by the Claude app on demand."
+busy = ["Claude"]

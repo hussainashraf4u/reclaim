@@ -13,7 +13,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: scripts/build_executable.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: macos-binary
           path: dist/*.zip*
